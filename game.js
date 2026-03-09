@@ -26,6 +26,8 @@ let gameState = {
         diversified: false,
         whale: false
     }
+    lastBonusDate: null,
+    bonusStreak: 0
 };
 
 // Cryptocurrencies
@@ -59,6 +61,7 @@ function initGame() {
     });
 
     loadGame();
+    checkBonusOnStart();
     updateHeader();
     updateCryptoList();
     updatePortfolio();
@@ -583,3 +586,68 @@ document.getElementById('sellBtn').addEventListener('click', sellCrypto);
 
 // Start game
 initGame();
+function checkDailyBonus() {
+    const now = new Date();
+    const today = now.toDateString();
+    
+    if (gameState.lastBonusDate !== today) {
+        if (gameState.lastBonusDate) {
+            const lastDate = new Date(gameState.lastBonusDate);
+            const diffDays = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+            if (diffDays > 1) {
+                gameState.bonusStreak = 0;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+function claimDailyBonus() {
+    if (!checkDailyBonus()) {
+        tg.showPopup({
+            title: '❌ Бонус',
+            message: 'Бонус уже получен сегодня!',
+            buttons: [{ type: 'ok' }]
+        });
+        return;
+    }
+    
+    const now = new Date();
+    gameState.lastBonusDate = now.toDateString();
+    gameState.bonusStreak++;
+    
+    const baseBonus = 100;
+    const streakBonus = gameState.bonusStreak * 50;
+    const totalBonus = baseBonus + streakBonus;
+    
+    gameState.cash += totalBonus;
+    
+    tg.showPopup({
+        title: '🎁 Бонус получен!',
+        message: `+$${totalBonus}\nСерия: ${gameState.bonusStreak} дней`,
+        buttons: [{ type: 'ok' }]
+    });
+    
+    tg.HapticFeedback.notificationOccurred('success');
+    updateBalances();
+    saveGame();
+}
+
+// Проверка при загрузке игры
+function checkBonusOnStart() {
+    if (checkDailyBonus()) {
+        tg.showPopup({
+            title: '🎁 Ежедневный бонус!',
+            message: `Забери бонус!\nТекущая серия: ${gameState.bonusStreak} дней`,
+            buttons: [
+                { id: 'claim', type: 'default', text: 'Забрать' },
+                { type: 'cancel', text: 'Позже' }
+            ]
+        }, (buttonId) => {
+            if (buttonId === 'claim') {
+                claimDailyBonus();
+            }
+        });
+    }
+}
